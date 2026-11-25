@@ -1,0 +1,46 @@
+# Adds Ollama as a third container and downloads the model on first start (~4.7 GB).
+#
+#   docker compose -f docker-compose.yml -f docker-compose.ollama.yml up --build
+#
+# Without a GPU passed to the container, Ollama runs on CPU, which is much slower.
+# On macOS Docker can't use the GPU at all: run Ollama natively and use docker-compose.yml alone.
+
+services:
+  ollama:
+    image: ollama/ollama:latest
+    volumes:
+      - ollama-models:/root/.ollama
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+    restart: unless-stopped
+    # NVIDIA GPU (Linux + nvidia-container-toolkit, or Windows Docker Desktop with WSL2): uncomment
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: all
+    #           capabilities: [gpu]
+
+  ollama-pull:
+    image: ollama/ollama:latest
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+    command: ["pull", "${LLM_MODEL:-qwen2.5:7b}"]
+    depends_on:
+      ollama:
+        condition: service_healthy
+    restart: "no"
+
+  backend:
+    environment:
+      OLLAMA_URL: http://ollama:11434
+    depends_on:
+      ollama-pull:
+        condition: service_completed_successfully
+
+volumes:
+  ollama-models:

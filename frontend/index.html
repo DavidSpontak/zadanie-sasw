@@ -1,0 +1,721 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Code Review Assistant</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 26 26'%3E%3Crect x='1' y='1' width='24' height='24' rx='7' fill='%232B67AF'/%3E%3Crect x='7' y='7.5' width='9' height='2.2' rx='1.1' fill='white'/%3E%3Crect x='7' y='11.9' width='12' height='2.2' rx='1.1' fill='white'/%3E%3Crect x='7' y='16.3' width='6' height='2.2' rx='1.1' fill='white'/%3E%3Ccircle cx='18.2' cy='17.4' r='2.1' fill='white'/%3E%3C/svg%3E">
+<style>
+  /* Fonts: Atkinson Hyperlegible Next + Mono (SIL Open Font License, see fonts/OFL.txt).
+     Built for legibility, which also helps on a projector. */
+  @font-face {
+    font-family: "Atkinson Hyperlegible Next"; font-style: normal; font-weight: 200 800; font-display: swap;
+    src: url("/fonts/atkinson-hyperlegible-next-latin-ext-wght-normal.woff2") format("woff2");
+    unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+  }
+  @font-face {
+    font-family: "Atkinson Hyperlegible Next"; font-style: normal; font-weight: 200 800; font-display: swap;
+    src: url("/fonts/atkinson-hyperlegible-next-latin-wght-normal.woff2") format("woff2");
+    unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+  }
+  @font-face {
+    font-family: "Atkinson Hyperlegible Mono"; font-style: normal; font-weight: 200 800; font-display: swap;
+    src: url("/fonts/atkinson-hyperlegible-mono-latin-ext-wght-normal.woff2") format("woff2");
+    unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+  }
+  @font-face {
+    font-family: "Atkinson Hyperlegible Mono"; font-style: normal; font-weight: 200 800; font-display: swap;
+    src: url("/fonts/atkinson-hyperlegible-mono-latin-wght-normal.woff2") format("woff2");
+    unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+  }
+
+  :root {
+    --canvas: #ECEFF3;
+    --paper: #FFFFFF;
+    --ink: #18212D;
+    --slate: #5A6577;
+    --rule: #D6DCE4;
+    --editor: #1B2230;
+    --editor-fg: #D5DCE7;
+    --gutter: #6B768C;
+    --critical: #C23A2F;
+    --high: #C8601A;
+    --medium: #9E7300;
+    --low: #2E7A4E;
+    --info: #5A6577;
+    --accent: #34445E;                      /* auto-detect: neutral */
+    --sans: "Atkinson Hyperlegible Next", system-ui, "Segoe UI", Roboto, sans-serif;
+    --mono: "Atkinson Hyperlegible Mono", ui-monospace, "Cascadia Code", Consolas, monospace;
+  }
+  body[data-lang="python"] { --accent: #2B67AF; }
+  body[data-lang="csharp"] { --accent: #7449C2; }
+
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body { margin: 0; background: var(--canvas); color: var(--ink); font: 400 15px/1.55 var(--sans); }
+  button, input, textarea { font: inherit; color: inherit; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+  /* ── Top bar ─────────────────────────────────────────────── */
+  .topbar { display: flex; align-items: center; justify-content: space-between; gap: 16px;
+            padding: 12px 28px; background: var(--paper); border-bottom: 1px solid var(--rule); }
+  .brand { display: flex; align-items: center; gap: 11px; font-size: 18px; font-weight: 700; letter-spacing: -0.01em; }
+  .mark-bg { fill: var(--accent); transition: fill .3s ease; }
+  .topbar-side { display: flex; align-items: center; gap: 18px; }
+  .docs-link { color: var(--slate); font-size: 14px; text-decoration: none; }
+  .docs-link:hover { color: var(--ink); text-decoration: underline; }
+  .status { display: inline-flex; align-items: center; gap: 8px; padding: 5px 12px; border: 1px solid var(--rule);
+            border-radius: 999px; font-size: 13.5px; color: var(--slate); white-space: nowrap; }
+  .status::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: #A3ADBC; }
+  .status[data-state="ready"]::before { background: var(--low); }
+  .status[data-state="offline"]::before { background: var(--critical); }
+  .status[data-state="offline"] { color: var(--critical); border-color: #EBC3BF; }
+
+  /* ── Workbench ───────────────────────────────────────────── */
+  .workbench { max-width: 1340px; margin: 0 auto; padding: 28px; display: grid;
+               grid-template-columns: minmax(0, 11fr) minmax(0, 12fr); gap: 32px; align-items: start; }
+
+  .composer { background: var(--paper); border: 1px solid var(--rule); border-radius: 14px; padding: 22px 22px 20px; }
+  .field-label { display: block; margin: 0 0 7px; padding: 0; font-weight: 700; font-size: 15px; }
+  .label-row { display: flex; align-items: baseline; gap: 10px; margin-top: 18px; }
+  .optional { color: var(--slate); font-size: 13.5px; }
+  .editor-hint { margin-left: auto; color: var(--slate); font-size: 12.5px; }
+
+  .lang { border: 0; margin: 0 0 18px; padding: 0; min-width: 0; }
+  .segmented { display: inline-flex; gap: 3px; padding: 3px; background: var(--canvas); border-radius: 10px; }
+  .segmented input { position: absolute; opacity: 0; pointer-events: none; }
+  .segmented label { padding: 6px 15px; border-radius: 7px; color: var(--slate); font-weight: 600; cursor: pointer;
+                     transition: color .2s ease, background-color .2s ease; }
+  .segmented label:hover { color: var(--ink); }
+  .segmented input:checked + label { background: var(--paper); color: var(--accent); box-shadow: 0 1px 2px rgba(24, 33, 45, .14); }
+  .segmented input:focus-visible + label { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+  .question { width: 100%; min-height: 76px; padding: 10px 12px; border: 1px solid var(--rule); border-radius: 10px;
+              background: var(--paper); resize: vertical; line-height: 1.5; }
+  .question:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent); }
+  .question::placeholder { color: #8A94A4; }
+
+  /* Code editor: textarea + line-number gutter that shows review markers */
+  .editor { display: grid; grid-template-columns: auto minmax(0, 1fr); height: 330px; min-height: 160px;
+            background: var(--editor); border-radius: 10px; overflow: hidden; resize: vertical; }
+  .editor:focus-within { box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 35%, transparent); }
+  .gutter, .code { font: 400 13.5px/1.6 var(--mono); padding-top: 12px; }
+  .gutter { overflow: hidden; padding: 12px 10px 40px 12px; min-width: 52px; text-align: right; color: var(--gutter);
+            border-right: 1px solid #2A3243; user-select: none; }
+  .gutter span { display: block; position: relative; padding-left: 14px; border-radius: 4px; }
+  .gutter span[data-sev] { color: #FFFFFF; font-weight: 700; }
+  .gutter span[data-sev]::before { content: ""; position: absolute; left: 0; top: 50%; width: 8px; height: 8px; margin-top: -4px;
+                                   border-radius: 50%; background: var(--sev); animation: marker-in .35s ease-out both; }
+  .gutter span.flash { animation: line-flash 1.4s ease-out; }
+  .code { margin: 0; border: 0; resize: none; width: 100%; height: 100%; padding: 12px 14px 12px; background: transparent;
+          color: var(--editor-fg); white-space: pre; overflow: auto; tab-size: 4; caret-color: #FFFFFF; }
+  .code:focus { outline: none; }
+  .code::placeholder { color: #69748A; }
+  .code::selection { background: color-mix(in srgb, var(--accent) 60%, transparent); color: #FFFFFF; }
+  [data-sev="critical"] { --sev: var(--critical); }
+  [data-sev="high"] { --sev: var(--high); }
+  [data-sev="medium"] { --sev: var(--medium); }
+  [data-sev="low"] { --sev: var(--low); }
+  [data-sev="info"] { --sev: var(--info); }
+
+  .actions { display: flex; align-items: center; gap: 14px; margin-top: 18px; }
+  .primary { padding: 11px 22px; border: 0; border-radius: 9px; background: var(--accent); color: #FFFFFF;
+             font-weight: 700; cursor: pointer; transition: background-color .3s ease, filter .15s ease; }
+  .primary:hover { filter: brightness(1.1); }
+  .primary:disabled { cursor: progress; filter: saturate(.6); }
+  .shortcut { color: var(--slate); font-size: 13px; }
+  kbd { font: inherit; padding: 1px 6px; border: 1px solid var(--rule); border-bottom-width: 2px; border-radius: 5px; background: var(--paper); }
+  .quiet { margin-left: auto; padding: 8px 4px; border: 0; background: none; color: var(--slate); cursor: pointer; }
+  .quiet:hover { color: var(--ink); text-decoration: underline; }
+
+  /* ── Review pane ─────────────────────────────────────────── */
+  .review { min-width: 0; padding-top: 4px; }
+  .review:focus { outline: none; }
+  .review h2 { margin: 0 0 10px; font-size: 15px; font-weight: 700; color: var(--slate); }
+  .review .lead { margin: 0 0 10px; font-size: 25px; line-height: 1.25; font-weight: 700; color: var(--ink); letter-spacing: -0.015em; max-width: 26ch; text-wrap: balance; }
+  .muted { color: var(--slate); }
+  .answer, .intro, .state p, .loading p { max-width: 68ch; }
+
+  .empty .intro { margin: 0 0 26px; color: var(--slate); font-size: 16px; }
+  .empty h3 { margin: 0 0 10px; font-size: 15px; font-weight: 700; }
+  .examples { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .example { display: flex; flex-direction: column; justify-content: flex-start; width: 100%; height: 100%; text-align: left; padding: 12px 14px; border: 1px solid var(--rule); border-radius: 10px;
+             background: var(--paper); cursor: pointer; transition: border-color .15s ease; }
+  .example:hover { border-color: var(--accent); }
+  .example strong { display: block; font-size: 15px; }
+  .example span { display: block; margin-top: 2px; color: var(--slate); font-size: 13.5px; }
+
+  .review .loading .lead { max-width: none; }
+  .progress { position: relative; height: 3px; margin: 18px 0 10px; border-radius: 3px; background: var(--rule); overflow: hidden; max-width: 420px; }
+  .progress::after { content: ""; position: absolute; inset: 0 auto 0 0; width: 35%; border-radius: 3px; background: var(--accent);
+                     animation: slide 1.4s ease-in-out infinite; }
+
+  .result > * + * { margin-top: 28px; }
+  .note { margin-top: 18px; color: var(--slate); font-size: 13.5px; }
+  .note::before { content: ""; display: inline-block; width: 7px; height: 7px; margin-right: 8px; border-radius: 50%;
+                  background: var(--low); vertical-align: 1px; }
+  .notice { margin: 0; padding: 10px 14px; border: 1px solid #EED9A4; border-radius: 9px; background: #FFF7E3; color: #5F4700; font-size: 14px; }
+
+  .answer { margin: 0; font-size: 17.5px; line-height: 1.6; }
+  .facts { display: flex; flex-wrap: wrap; gap: 8px 30px; margin: 16px 0 0; }
+  .facts dt { font-size: 12.5px; color: var(--slate); }
+  .facts dd { margin: 0; font-weight: 700; font-size: 14.5px; }
+  .meter { display: inline-block; width: 54px; height: 6px; margin-left: 8px; border-radius: 3px; background: var(--rule); vertical-align: middle; overflow: hidden; }
+  .meter i { display: block; height: 100%; background: var(--accent); }
+
+  .nowrap { white-space: nowrap; }
+  .refs { position: relative; top: -0.45em; vertical-align: baseline; line-height: 1; white-space: nowrap; }
+  .ref { display: inline-block; min-width: 1.5em; margin-left: 2px; padding: 1px 4px; border: 0; border-radius: 5px; cursor: pointer;
+         font: 700 11px/1.35 var(--sans); text-align: center; color: var(--accent);
+         background: color-mix(in srgb, var(--accent) 13%, transparent); }
+  .ref:hover { background: color-mix(in srgb, var(--accent) 24%, transparent); }
+
+  .issues-head { display: flex; align-items: baseline; gap: 12px; margin-bottom: 10px; }
+  .issues-head h2 { margin: 0; }
+  .issues-count { font-size: 14px; color: var(--slate); }
+  .issue-list { list-style: none; margin: 0; padding: 0; background: var(--paper); border: 1px solid var(--rule); border-radius: 12px; overflow: hidden; }
+  .issue { padding: 14px 18px 14px 22px; box-shadow: inset 4px 0 0 var(--sev); }
+  .issue + .issue { border-top: 1px solid var(--rule); }
+  .issue-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .sev { padding: 2px 9px; border-radius: 999px; font-size: 12.5px; font-weight: 700; color: var(--sev);
+         background: color-mix(in srgb, var(--sev) 12%, transparent); }
+  .cat { font-size: 13.5px; color: var(--slate); }
+  .line-link { padding: 0; border: 0; background: none; color: var(--accent); font-weight: 700; font-size: 13.5px; cursor: pointer;
+               text-decoration: underline; text-decoration-style: dotted; text-underline-offset: 3px; }
+  .issue-head .line-link { margin-left: auto; }
+  .issue-desc { margin: 8px 0 6px; }
+  .issue-fix { margin: 0; color: var(--slate); font-size: 14.5px; }
+  .fix-label { color: var(--ink); font-weight: 700; margin-right: 4px; }
+  .all-clear { margin: 0; padding: 14px 18px; background: var(--paper); border: 1px solid var(--rule); border-radius: 12px; }
+
+  .drawer { border-top: 1px solid var(--rule); }
+  .drawer:last-child { border-bottom: 1px solid var(--rule); }
+  .drawer summary { display: flex; align-items: center; gap: 10px; padding: 14px 2px; font-weight: 700; cursor: pointer; list-style: none; }
+  .drawer summary::-webkit-details-marker { display: none; }
+  .drawer summary::after { content: ""; width: 8px; height: 8px; margin: -4px 6px 0 auto; border-right: 2px solid var(--slate);
+                           border-bottom: 2px solid var(--slate); transform: rotate(45deg); transition: transform .2s ease; }
+  .drawer[open] summary::after { transform: rotate(-135deg); margin-top: 4px; }
+  .drawer-count { padding: 0 8px; border-radius: 999px; background: #DFE4EA; color: var(--slate); font-size: 12.5px; }
+  .drawer-body { list-style: none; margin: 0 0 16px; padding: 0; }
+
+  .checks li { display: flex; gap: 14px; padding: 7px 0; font-size: 14.5px; }
+  .checks .line-link { flex: none; min-width: 58px; text-align: left; }
+
+  .source { padding: 12px 0; border-radius: 8px; }
+  .source + .source { border-top: 1px solid var(--rule); }
+  .source-head { display: flex; align-items: flex-start; gap: 12px; }
+  .source-n { flex: none; display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; font-size: 12.5px; font-weight: 700;
+              color: var(--accent); background: color-mix(in srgb, var(--accent) 13%, transparent); }
+  .source-name { flex: 1; min-width: 0; }
+  .source-name strong { display: block; }
+  .source-name span { display: block; color: var(--slate); font-size: 14px; }
+  .match { flex: none; color: var(--slate); font-size: 13px; }
+  .excerpt { margin: 10px 0 0 36px; padding: 10px 12px; max-height: 190px; overflow: auto; border: 1px solid var(--rule); border-radius: 8px;
+             background: #F5F7FA; color: #2B3444; font: 400 12.5px/1.55 var(--mono); white-space: pre-wrap; }
+  .source.flash { animation: source-flash 1.6s ease-out; }
+
+  @keyframes marker-in { from { transform: scale(0); } to { transform: scale(1); } }
+  @keyframes line-flash { 0%, 30% { background: color-mix(in srgb, var(--sev, #FFFFFF) 45%, transparent); } 100% { background: transparent; } }
+  @keyframes source-flash { 0%, 30% { background: color-mix(in srgb, var(--accent) 14%, transparent); } 100% { background: transparent; } }
+  @keyframes slide { 0% { transform: translateX(-100%); } 100% { transform: translateX(300%); } }
+
+  @media (min-width: 1001px) and (min-height: 760px) {
+    .composer { position: sticky; top: 20px; }
+  }
+  @media (max-width: 1000px) {
+    .workbench { grid-template-columns: minmax(0, 1fr); padding: 18px; gap: 26px; }
+    .topbar { padding: 12px 18px; }
+    .docs-link { display: none; }
+  }
+  @media (max-width: 560px) {
+    .brand { font-size: 16px; }
+    .composer { padding: 16px; }
+    .editor { height: 250px; }
+    .examples { grid-template-columns: minmax(0, 1fr); }
+    .shortcut, .editor-hint { display: none; }
+    .review .lead { font-size: 21px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation: none !important; transition: none !important; }
+  }
+</style>
+</head>
+<body data-lang="auto">
+
+<header class="topbar">
+  <div class="brand">
+    <svg width="26" height="26" viewBox="0 0 26 26" aria-hidden="true">
+      <rect class="mark-bg" x="1" y="1" width="24" height="24" rx="7"/>
+      <rect x="7" y="7.5" width="9" height="2.2" rx="1.1" fill="#FFFFFF"/>
+      <rect x="7" y="11.9" width="12" height="2.2" rx="1.1" fill="#FFFFFF"/>
+      <rect x="7" y="16.3" width="6" height="2.2" rx="1.1" fill="#FFFFFF"/>
+      <circle cx="18.2" cy="17.4" r="2.1" fill="#FFFFFF"/>
+    </svg>
+    <span>Code Review Assistant</span>
+  </div>
+  <div class="topbar-side">
+    <span class="status" id="status" data-state="checking" role="status"><span id="status-text">Checking model…</span></span>
+  </div>
+</header>
+
+<main class="workbench">
+  <section class="composer" id="composer" aria-label="Question and code">
+    <form id="form" novalidate>
+      <fieldset class="lang">
+        <legend class="field-label">Language</legend>
+        <div class="segmented">
+          <input type="radio" name="language" id="lang-auto" value="auto" checked><label for="lang-auto">Auto-detect</label>
+          <input type="radio" name="language" id="lang-python" value="python"><label for="lang-python">Python</label>
+          <input type="radio" name="language" id="lang-csharp" value="csharp"><label for="lang-csharp">C#</label>
+        </div>
+      </fieldset>
+
+      <label class="field-label" for="question">Question</label>
+      <textarea class="question" id="question" rows="3" placeholder="Is this safe? How should I handle errors here?"></textarea>
+
+      <div class="label-row">
+        <label class="field-label" for="code">Code</label>
+        <span class="optional">Optional</span>
+        <span class="editor-hint" id="editor-hint">Tab indents. Press Esc, then Tab, to leave the editor.</span>
+      </div>
+      <div class="editor">
+        <div class="gutter" id="gutter" aria-hidden="true"></div>
+        <textarea class="code" id="code" wrap="off" spellcheck="false" autocomplete="off" autocapitalize="off" aria-describedby="editor-hint"
+                  placeholder="Paste code to review"></textarea>
+      </div>
+
+      <div class="actions">
+        <button class="primary" id="submit" type="submit">Ask question</button>
+        <span class="shortcut" id="shortcut"><kbd>Ctrl</kbd> + <kbd>Enter</kbd></span>
+        <button class="quiet" id="clear" type="button">Clear</button>
+      </div>
+    </form>
+  </section>
+
+  <section class="review" id="out" aria-live="polite" tabindex="-1"></section>
+</main>
+
+<script>
+// Everything coming from the server is inserted with textContent / DOM nodes, never innerHTML.
+const $ = (id) => document.getElementById(id);
+const code = $("code"), gutter = $("gutter"), question = $("question"), submitBtn = $("submit");
+const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+const scrollMode = reduceMotion ? "auto" : "smooth";
+
+const SEVERITIES = ["critical", "high", "medium", "low", "info"];
+const SEV_LABEL = { critical: "Critical", high: "High", medium: "Medium", low: "Low", info: "Info" };
+const LANG_LABEL = { python: "Python", csharp: "C#" };
+const REF_RE = /(?<![\w\])])\[(\d+(?:\s*,\s*\d+)*)\]/g;
+
+const EXAMPLES = [
+  {
+    title: "SQL query in Python", note: "Code with an injection risk and a shared default list", language: "python",
+    question: "Review this function for security and correctness issues.",
+    code: [
+      "def get_users(name, result=[]):",
+      "    query = \"SELECT * FROM users WHERE name = '\" + name + \"'\"",
+      "    for row in db.execute(query):",
+      "        result.append(row)",
+      "    return result",
+    ].join("\n"),
+  },
+  {
+    title: "Async method in C#", note: "Code that blocks on a task and swallows errors", language: "csharp",
+    question: "Review this method.",
+    code: [
+      "public async void LoadOrders(string customer)",
+      "{",
+      "    var client = new HttpClient();",
+      "    var json = client.GetStringAsync(\"https://shop.local/orders?c=\" + customer).Result;",
+      "    try",
+      "    {",
+      "        Save(json);",
+      "    }",
+      "    catch (Exception)",
+      "    {",
+      "    }",
+      "}",
+    ].join("\n"),
+  },
+  {
+    title: "Deadlocks with async in C#", note: "A question without code", language: "csharp",
+    question: "Why can calling .Result on a Task cause a deadlock, and what should I do instead?", code: "",
+  },
+  {
+    title: "Structuring unit tests", note: "A question without code", language: "python",
+    question: "How should I structure unit tests, and when should I parametrize them?", code: "",
+  },
+];
+
+let markers = {};          // line number -> severity, shown in the gutter after a review
+let modelName = "the model";
+
+function el(tag, props = {}, ...children) {
+  const node = document.createElement(tag);
+  for (const [key, value] of Object.entries(props)) {
+    if (value === false || value == null) continue;
+    if (key === "class") node.className = value;
+    else if (key === "text") node.textContent = value;
+    else if (key.startsWith("on")) node.addEventListener(key.slice(2), value);
+    else node.setAttribute(key, value === true ? "" : value);
+  }
+  for (const child of children) if (child != null && child !== false) node.append(child);
+  return node;
+}
+
+/* ── Language & button ───────────────────────────────────── */
+const selectedLanguage = () => document.querySelector('input[name="language"]:checked').value;
+const setAccent = (lang) => { document.body.dataset.lang = lang; };
+document.querySelectorAll('input[name="language"]').forEach((input) =>
+  input.addEventListener("change", () => setAccent(selectedLanguage())));
+
+function updateButton() {
+  if (!submitBtn.disabled) submitBtn.textContent = code.value.trim() ? "Review code" : "Ask question";
+}
+question.addEventListener("input", updateButton);
+if (/Mac|iPhone|iPad/.test(navigator.platform)) $("shortcut").replaceChildren(el("kbd", { text: "⌘" }), " + ", el("kbd", { text: "Enter" }));
+
+/* ── Code editor gutter ──────────────────────────────────── */
+function renderGutter() {
+  const count = Math.max(1, code.value.split("\n").length);
+  const frag = document.createDocumentFragment();
+  for (let n = 1; n <= count; n++) {
+    const sev = markers[n];
+    frag.append(el("span", { text: String(n), "data-sev": sev || false, title: sev ? `${SEV_LABEL[sev]} issue on line ${n}` : false }));
+  }
+  gutter.replaceChildren(frag);
+  gutter.scrollTop = code.scrollTop;
+}
+code.addEventListener("input", () => { markers = {}; renderGutter(); updateButton(); });
+code.addEventListener("scroll", () => { gutter.scrollTop = code.scrollTop; });
+
+function selectLine(n) {
+  const lines = code.value.split("\n");
+  if (!n || n < 1 || n > lines.length) return;
+  let start = 0;
+  for (let i = 0; i < n - 1; i++) start += lines[i].length + 1;
+  if (window.matchMedia("(max-width: 1000px)").matches) $("composer").scrollIntoView({ behavior: scrollMode, block: "start" });
+  code.focus({ preventScroll: true });
+  code.setSelectionRange(start, start + lines[n - 1].length);
+  const lineHeight = parseFloat(getComputedStyle(code).lineHeight) || 21.6;
+  code.scrollTop = Math.max(0, (n - 1) * lineHeight - code.clientHeight / 3);
+  gutter.scrollTop = code.scrollTop;
+  const span = gutter.children[n - 1];
+  if (span) { span.classList.remove("flash"); void span.offsetWidth; span.classList.add("flash"); }
+}
+
+/* ── Tab key in the code editor ─────────────────────────────
+   Tab inserts 4 spaces (or indents the selected lines), Shift+Tab removes them.
+   Esc, then Tab, moves focus on as usual, so keyboard users can leave the editor. */
+const INDENT = "    ";
+let tabLeavesEditor = false;
+
+function replaceRange(start, end, text) {
+  code.setSelectionRange(start, end);
+  // insertText keeps Ctrl+Z working; setRangeText is the fallback where it isn't supported
+  if (!document.execCommand("insertText", false, text)) {
+    code.setRangeText(text, start, end, "end");
+    code.dispatchEvent(new Event("input", { bubbles: true }));
+  }
+}
+
+function indentSelection(outdent) {
+  const v = code.value, s = code.selectionStart, e = code.selectionEnd;
+  if (!outdent && !v.slice(s, e).includes("\n")) { replaceRange(s, e, INDENT); return; }
+  const from = v.lastIndexOf("\n", s - 1) + 1;
+  let to = v.indexOf("\n", e > s && v[e - 1] === "\n" ? e - 1 : e);
+  if (to === -1) to = v.length;
+  const before = v.slice(from, to);
+  const lines = before.split("\n");
+  const after = lines.map((line) => outdent ? line.replace(/^( {1,4}|\t)/, "") : INDENT + line).join("\n");
+  if (after === before) return;
+  replaceRange(from, to, after);
+  if (s === e) {                       // one cursor: keep it where it was on the line
+    const shift = after.split("\n")[0].length - lines[0].length;
+    const pos = Math.max(from, s + shift);
+    code.setSelectionRange(pos, pos);
+  } else {                             // a selection: keep the changed lines selected
+    code.setSelectionRange(from, from + after.length);
+  }
+}
+
+code.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") { tabLeavesEditor = true; return; }
+  if (e.key !== "Tab") { tabLeavesEditor = false; return; }
+  if (tabLeavesEditor || e.ctrlKey || e.altKey || e.metaKey) return;
+  e.preventDefault();
+  indentSelection(e.shiftKey);
+});
+code.addEventListener("blur", () => { tabLeavesEditor = false; });
+
+/* ── Keyboard ─────────────────────────────────────────────── */
+for (const field of [question, code]) {
+  field.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); $("form").requestSubmit(); }
+  });
+}
+
+/* ── Status (is Ollama + the model available?) ───────────── */
+async function checkHealth() {
+  const box = $("status"), label = $("status-text");
+  try {
+    const res = await fetch("/api/health");
+    if (!res.ok) throw new Error();
+    const h = await res.json();
+    modelName = h.model;
+    box.dataset.state = h.ollama_ready ? "ready" : "offline";
+    label.textContent = h.ollama_ready ? `${h.model} ready` : `${h.model} not available`;
+    box.title = h.ollama_ready ? "Ollama is running and the model is installed" : "Start Ollama and pull the model";
+  } catch {
+    box.dataset.state = "offline";
+    label.textContent = "Backend not reachable";
+    box.title = "Start the backend, e.g. with docker compose up";
+  }
+}
+
+/* ── Views ────────────────────────────────────────────────── */
+function renderEmpty() {
+  const list = el("ul", { class: "examples" });
+  for (const ex of EXAMPLES) {
+    list.append(el("li", {}, el("button", { type: "button", class: "example", onclick: () => useExample(ex) },
+      el("strong", { text: ex.title }), el("span", { text: ex.note }))));
+  }
+  $("out").replaceChildren(el("div", { class: "empty" },
+    el("p", { class: "lead", text: "Ask about code, or paste some to review" }),
+    el("p", { class: "intro", text: "Answers come only from the Python and C# guides in the knowledge base, and every answer can show the passages it used." }),
+    el("h3", { text: "Try an example" }),
+    list));
+}
+
+function useExample(ex) {
+  question.value = ex.question;
+  code.value = ex.code;
+  document.querySelector(`input[name="language"][value="${ex.language}"]`).checked = true;
+  setAccent(ex.language);
+  markers = {};
+  renderGutter();
+  updateButton();
+  submitBtn.focus();
+}
+
+function renderLoading(lang, hasCode) {
+  const where = lang === "auto" ? "the guides" : `the ${LANG_LABEL[lang]} guides`;
+  $("out").replaceChildren(el("div", { class: "loading" },
+    el("p", { class: "lead", text: hasCode ? "Reviewing your code…" : "Looking it up…" }),
+    el("div", { class: "progress", role: "progressbar", "aria-label": "Waiting for the answer" }),
+    el("p", { class: "muted" }, `Searching ${where} and asking ${modelName}. A local model can take a minute. `,
+      el("span", { id: "elapsed", text: "0 s" }))));
+}
+
+function renderMessage(title, text, hint) {
+  $("out").replaceChildren(el("div", { class: "state" },
+    el("p", { class: "lead", text: title }), el("p", { text }), hint ? el("p", { class: "muted", text: hint }) : null));
+}
+
+function withRefs(text, available) {
+  const frag = document.createDocumentFragment();
+  let last = 0;
+  for (const m of text.matchAll(REF_RE)) {
+    const nums = m[1].split(",").map((s) => parseInt(s, 10)).filter((n) => available.has(n));
+    const before = text.slice(last, m.index);
+    if (nums.length) {
+      // keep the last word and its citation chips together so a chip never starts a new line
+      const trimmed = before.replace(/\s+$/, "");
+      const cut = Math.max(trimmed.lastIndexOf(" "), trimmed.lastIndexOf("\n")) + 1;
+      frag.append(trimmed.slice(0, cut), el("span", { class: "nowrap" }, trimmed.slice(cut), refButtons(nums)));
+    } else {
+      frag.append(before);
+    }
+    last = m.index + m[0].length;
+  }
+  frag.append(text.slice(last));
+  return frag;
+}
+
+function refButtons(nums) {
+  const sup = el("sup", { class: "refs" });
+  for (const n of nums) sup.append(el("button", { type: "button", class: "ref", "aria-label": `Show source ${n}`, onclick: () => openSource(n) }, String(n)));
+  return sup;
+}
+
+function openSource(n) {
+  const drawer = $("sources-drawer"), item = $(`source-${n}`);
+  if (!drawer || !item) return;
+  drawer.open = true;
+  item.scrollIntoView({ behavior: scrollMode, block: "center" });
+  item.classList.remove("flash"); void item.offsetWidth; item.classList.add("flash");
+}
+
+function drawer(id, title, count, body) {
+  return el("details", { class: "drawer", id },
+    el("summary", {}, el("span", { text: title }), el("span", { class: "drawer-count", text: String(count) })), body);
+}
+
+function issueItem(issue, available) {
+  const mentioned = new Set([...`${issue.description} ${issue.suggestion}`.matchAll(REF_RE)].flatMap((m) => m[1].split(",").map(Number)));
+  const extra = issue.sources.filter((n) => available.has(n) && !mentioned.has(n));
+  return el("li", { class: "issue", "data-sev": issue.severity },
+    el("div", { class: "issue-head" },
+      el("span", { class: "sev", text: SEV_LABEL[issue.severity] }),
+      el("span", { class: "cat", text: issue.category[0].toUpperCase() + issue.category.slice(1) }),
+      issue.line ? el("button", { type: "button", class: "line-link", onclick: () => selectLine(issue.line), "aria-label": `Show line ${issue.line} in the code` }, `Line ${issue.line}`) : null),
+    el("p", { class: "issue-desc" }, withRefs(issue.description, available), extra.length ? refButtons(extra) : null),
+    el("p", { class: "issue-fix" }, el("span", { class: "fix-label", text: "Fix" }), withRefs(issue.suggestion, available)));
+}
+
+function sourceItem(s) {
+  const lines = s.quote.split("\n");
+  let section = "", excerpt = s.quote.trim();
+  if (/^#{1,6}\s/.test(lines[0])) {
+    section = lines[0].replace(/^#+\s*/, "").replace(/\s*\(continued\)$/, "");
+    excerpt = lines.slice(1).join("\n").trim();
+  }
+  excerpt = excerpt.replace(/^\s*```.*$/gm, "").replace(/`([^`\n]+)`/g, "$1").replace(/\n{3,}/g, "\n\n").trim();
+  return el("li", { class: "source", id: `source-${s.n}` },
+    el("div", { class: "source-head" },
+      el("span", { class: "source-n", text: String(s.n) }),
+      el("div", { class: "source-name" }, el("strong", { text: s.title }), section ? el("span", { text: section }) : null),
+      el("span", { class: "match", text: `${Math.round(s.relevance * 100)}% match` })),
+    excerpt ? el("pre", { class: "excerpt", text: excerpt + (s.quote.length >= 300 ? " …" : "") }) : null);
+}
+
+const severityRank = (sev) => SEVERITIES.indexOf(sev);
+
+function render(r, requestedLang, hadCode) {
+  if (r.language) setAccent(r.language);
+  const result = el("div", { class: "result" });
+  for (const w of r.warnings) result.append(el("p", { class: "notice", role: "note", text: w }));
+
+  if (r.abstained) {
+    const blocked = (r.abstain_reason || "").includes("prompt-injection");
+    result.append(el("div", { class: "state" },
+      el("p", { class: "lead", text: blocked ? "Question blocked" : "Not covered by the guides" }),
+      el("p", { text: r.abstain_reason || r.answer }),
+      blocked ? null : el("p", { class: "muted", text: "Try rephrasing the question, or switch the language." })));
+    for (const note of r.notes || []) result.append(el("p", { class: "note", text: note }));
+    markers = {};
+    renderGutter();
+    $("out").replaceChildren(result);
+    return;
+  }
+
+  const available = new Set(r.sources.map((s) => s.n));
+  const confidence = Math.round(r.confidence * 100);
+  const facts = el("dl", { class: "facts" });
+  for (const [term, value] of [
+    ["Language", LANG_LABEL[r.language] + (requestedLang === "auto" ? ", detected" : "")],
+    ["Confidence", el("span", {}, `${confidence}%`, el("span", { class: "meter", "aria-hidden": "true" }, el("i", { style: `width:${confidence}%` })))],
+    ["Time", `${r.latency_s.toFixed(1)} s`],
+    ["Model", r.model],
+  ]) facts.append(el("div", {}, el("dt", { text: term }), el("dd", {}, value)));
+
+  result.append(el("section", { "aria-label": "Summary" },
+    el("h2", { text: "Summary" }), el("p", { class: "answer" }, withRefs(r.answer, available)), facts));
+
+  // Issues, and markers in the code gutter
+  markers = {};
+  for (const item of [...r.issues, ...r.static_findings]) {
+    if (item.line && (!markers[item.line] || severityRank(item.severity) < severityRank(markers[item.line]))) markers[item.line] = item.severity;
+  }
+  if (hadCode) {
+    const issues = [...r.issues].sort((a, b) => severityRank(a.severity) - severityRank(b.severity) || (a.line || 0) - (b.line || 0));
+    const counts = SEVERITIES.map((sev) => [sev, issues.filter((i) => i.severity === sev).length]).filter(([, n]) => n);
+    result.append(el("section", { "aria-label": "Issues" },
+      el("div", { class: "issues-head" }, el("h2", { text: "Issues" }),
+        counts.length ? el("span", { class: "issues-count", text: counts.map(([sev, n]) => `${n} ${sev}`).join(", ") }) : null),
+      issues.length
+        ? el("ol", { class: "issue-list" }, ...issues.map((i) => issueItem(i, available)))
+        : el("p", { class: "all-clear", text: "No issues found in this code." })));
+  }
+
+  const drawers = [];
+  if (r.static_findings.length) {
+    drawers.push(drawer("checks-drawer", "Automated checks", r.static_findings.length,
+      el("ul", { class: "drawer-body checks" }, ...r.static_findings.map((f) => el("li", { "data-sev": f.severity },
+        el("button", { type: "button", class: "line-link", onclick: () => selectLine(f.line) }, `Line ${f.line}`),
+        el("span", { text: f.message }))))));
+  }
+  if (r.sources.length) {
+    drawers.push(drawer("sources-drawer", "Sources", r.sources.length,
+      el("ol", { class: "drawer-body" }, ...r.sources.map(sourceItem))));
+  }
+  if (drawers.length) result.append(el("div", {}, ...drawers));
+  for (const note of r.notes || []) result.append(el("p", { class: "note", text: note }));
+
+  renderGutter();
+  $("out").replaceChildren(result);
+  if (window.matchMedia("(max-width: 1000px)").matches) $("out").scrollIntoView({ behavior: scrollMode, block: "start" });
+}
+
+/* ── Submit ───────────────────────────────────────────────── */
+$("form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  if (submitBtn.disabled) return;
+  const lang = selectedLanguage();
+  const hasCode = code.value.trim().length > 0;
+  if (!question.value.trim() && !hasCode) {
+    renderMessage("Nothing to review yet", "Type a question or paste some code first.");
+    question.focus();
+    return;
+  }
+
+  submitBtn.disabled = true;
+  const started = performance.now();
+  const tick = () => {
+    const s = Math.round((performance.now() - started) / 1000);
+    submitBtn.textContent = `Reviewing… ${s} s`;
+    const label = $("elapsed");
+    if (label) label.textContent = `${s} s`;
+  };
+  renderLoading(lang, hasCode);
+  tick();
+  const timer = setInterval(tick, 1000);
+
+  try {
+    const res = await fetch("/api/review", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ question: question.value, code: hasCode ? code.value : null, language: lang }),
+    });
+    let data = null;
+    try { data = await res.json(); } catch { /* proxy error pages are HTML */ }
+    if (!res.ok) {
+      if (data && typeof data.detail === "string") throw new Error(data.detail);
+      if (data && data.detail) throw new Error("The request was not valid. Check the question and code length.");
+      if (res.status === 502 || res.status === 503) throw new Error("The backend isn't ready yet. It may still be starting or loading models; try again in a moment.");
+      if (res.status === 504) throw new Error("The model took too long to answer. Try a shorter question or less code.");
+      throw new Error(`The server answered with status ${res.status}.`);
+    }
+    render(data, lang, hasCode);
+  } catch (err) {
+    const offline = err instanceof TypeError;
+    renderMessage("Review failed", offline ? "The backend could not be reached." : err.message,
+      "Check that the backend and Ollama are running, then try again.");
+    checkHealth();
+  } finally {
+    clearInterval(timer);
+    submitBtn.disabled = false;
+    updateButton();
+  }
+});
+
+$("clear").addEventListener("click", () => {
+  question.value = "";
+  code.value = "";
+  $("lang-auto").checked = true;
+  setAccent("auto");
+  markers = {};
+  renderGutter();
+  updateButton();
+  renderEmpty();
+  question.focus();
+});
+
+renderGutter();
+updateButton();
+renderEmpty();
+checkHealth();
+</script>
+</body>
+</html>

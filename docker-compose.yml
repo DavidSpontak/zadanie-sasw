@@ -1,0 +1,27 @@
+# Frontend + backend. The backend uses the Ollama that runs on your machine (keeps GPU speed).
+#
+#   docker compose up --build        ->  http://localhost:8080
+#
+# To run Ollama in Docker as well, see docker-compose.ollama.yml.
+
+services:
+  backend:
+    build: ./backend
+    environment:
+      OLLAMA_URL: ${OLLAMA_URL:-http://host.docker.internal:11434}
+      LLM_MODEL: ${LLM_MODEL:-qwen2.5:7b}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"   # makes host.docker.internal work on Linux too
+    volumes:
+      # Edit documents without rebuilding; restart the backend to re-index
+      - ./backend/knowledge_base:/app/knowledge_base:ro
+    restart: unless-stopped
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "8080:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
